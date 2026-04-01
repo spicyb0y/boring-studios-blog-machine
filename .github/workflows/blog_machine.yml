@@ -1,0 +1,41 @@
+name: Boring Studios Blog Machine
+
+on:
+  schedule:
+    # Runs every Monday and Thursday at 9am AEST (11pm UTC Sunday/Wednesday)
+    - cron: '0 23 * * 0'
+    - cron: '0 23 * * 3'
+  workflow_dispatch: # allows manual trigger from GitHub Actions UI
+
+jobs:
+  publish-post:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write GSC service account key
+        run: echo '${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}' > gsc-service-account.json
+
+      - name: Run blog machine
+        env:
+          SHOPIFY_TOKEN:    ${{ secrets.SHOPIFY_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python blog_machine.py
+
+      - name: Commit publish log
+        run: |
+          git config user.name "Blog Machine"
+          git config user.email "actions@github.com"
+          git add publish_log.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Log: post published $(date +'%Y-%m-%d')"
+          git push
