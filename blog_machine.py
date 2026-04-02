@@ -72,6 +72,7 @@ Words and phrases to NEVER use:
 - Contrastive negation: never open with a wrong idea just to correct it
 - Overused qualifiers: very, really, just, quite, essentially
 - The word "cringe"
+- For headlines, never use over-titling or a long headline — keep headings, headlings and subheadlines shorter.
 
 STRUCTURE
 
