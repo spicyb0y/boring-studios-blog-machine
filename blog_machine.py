@@ -111,6 +111,20 @@ Examples:
 - "If you want to skip the setup, [product] has it all ready to go."
 - "[Product] is what I'd start with. It's all here."
 
+PRIORITY PRODUCTS — always prefer these first. Link to one of these in every post where it fits:
+- Creative Business Operating System (CBOS) — the full system for running a creative business → https://boringstudios.com.au/products/cbos-entire-system
+- Studio Starter Bundle — CBOS + essentials for new studios → https://boringstudios.com.au/products/studio-starter-cbos
+- CBOS Frameworks (8 x Figma frameworks) — client onboarding, proposals, contracts, invoices, offboarding, pitch, portfolio, services guide → https://boringstudios.com.au/products/cbos-frameworks-8-figma-frameworks
+- Contract Framework (Figma) → https://boringstudios.com.au/products/contract
+- Client Onboarding Framework (Figma) → https://boringstudios.com.au/products/client-onboarding-1
+- Client Offboarding Framework (Figma) → https://boringstudios.com.au/products/client-offboarding-1
+- Proposal Framework (Figma) → https://boringstudios.com.au/products/proposal-1
+- Invoice Framework (Figma) → https://boringstudios.com.au/products/invoice-1
+- Portfolio Framework (Figma) → https://boringstudios.com.au/products/portfolio-1
+- Services Guide Framework (Figma) → https://boringstudios.com.au/products/services-guide
+- Pitch Framework (Figma) → https://boringstudios.com.au/products/client-pitch
+
+If the post topic is branding or visual identity, you may also link to these:
 Only link to products from this exact list. Use the exact URLs shown:
 - Boring Branding book → https://boringstudios.com.au/products/boring-branding-building-a-brand-that-is-impossible-to-ignore
 - Brand Book → https://boringstudios.com.au/products/brand-book
@@ -392,8 +406,9 @@ The post must pass this checklist before you return it:
 - No filler openers
 - Headings are sentence case
 - Lists use full stops to separate bold label from explanation
-- Meta title under 60 characters
-- Meta description under 120 characters
+- Meta title is STRICTLY under 60 characters — count every character before returning
+- Meta description is STRICTLY under 120 characters
+- At least one CBOS or Figma framework product is linked unless the post is purely about visual branding
 """
 
     response = client.messages.create(
@@ -428,6 +443,12 @@ The post must pass this checklist before you return it:
         )
         content = retry.content[0].text.strip()
         post_data = json.loads(content)
+    # Hard enforce character limits
+    if len(post_data["meta_title"]) > 60:
+        post_data["meta_title"] = post_data["meta_title"][:57] + "..."
+    if len(post_data["meta_description"]) > 120:
+        post_data["meta_description"] = post_data["meta_description"][:117] + "..."
+
     print(f"\n Post written: '{post_data['title']}'")
     print(f"   Meta title ({len(post_data['meta_title'])} chars): {post_data['meta_title']}")
     print(f"   Meta desc ({len(post_data['meta_description'])} chars): {post_data['meta_description']}")
