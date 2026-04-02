@@ -110,7 +110,37 @@ Examples:
 - "We built [product] for exactly this. Go grab it here."
 - "If you want to skip the setup, [product] has it all ready to go."
 - "[Product] is what I'd start with. It's all here."
-Only link 1-2 products per post. Choose from: https://boringstudios.com.au/collections/all
+
+Only link to products from this exact list. Use the exact URLs shown:
+- Boring Branding book → https://boringstudios.com.au/products/boring-branding-building-a-brand-that-is-impossible-to-ignore
+- Brand Book → https://boringstudios.com.au/products/brand-book
+- Brand Guidelines → https://boringstudios.com.au/products/brand-guidelines
+- Brand Presentation → https://boringstudios.com.au/products/brand-presentation
+- Brand Strategy template → https://boringstudios.com.au/products/brand-strategy
+- Brand Voice → https://boringstudios.com.au/products/brand-voice
+- Client Agreement → https://boringstudios.com.au/products/client-agreement
+- Client Email Templates → https://boringstudios.com.au/products/client-email-templates
+- Client Offboarding → https://boringstudios.com.au/products/client-offboarding
+- Client Onboarding → https://boringstudios.com.au/products/client-onboarding
+- Client Portal (Notion) → https://boringstudios.com.au/products/client-portal
+- Client Proposal Template → https://boringstudios.com.au/products/proposal
+- Clients & Lead Generation book → https://boringstudios.com.au/products/clients-lead-generation-the-simple-steps-to-clients-and-leads
+- Content Planner (Notion) → https://boringstudios.com.au/products/content-planner
+- Content Strategy → https://boringstudios.com.au/products/content-strategy
+- Competitor Analysis → https://boringstudios.com.au/products/competitor-analysis
+- Creative Business Operating System (CBOS) → https://boringstudios.com.au/products/cbos-entire-system
+- Creator Bundle → https://boringstudios.com.au/products/freelance-creator-bundle
+- Daily Planner (Notion) → https://boringstudios.com.au/products/daily-planner
+- Freelance Starter Bundle → https://boringstudios.com.au/products/freelance-starter-bundle©-free-portfolio-template
+- From Creative Skill to Business book → https://boringstudios.com.au/products/from-creative-skill-to-your-first-profitable-business
+- Invoice → https://boringstudios.com.au/products/invoice
+- Portfolio → https://boringstudios.com.au/products/portfolio
+- Proposal Template → https://boringstudios.com.au/products/proposal
+- Services Guide → https://boringstudios.com.au/products/services-guide-template
+- Starter Bundle → https://boringstudios.com.au/products/client-starter-bundle
+- Studio Pro Bundle → https://boringstudios.com.au/products/freelancer-pro-bundle
+- Studio Starter Bundle → https://boringstudios.com.au/products/studio-starter-cbos
+- Thinking Like a Business Owner book → https://boringstudios.com.au/products/thinking-like-a-business-owner-the-mindset-shift-required-for-success
 
 LINK STYLING
 All hyperlinks must use inline styles: <a href="URL" style="color: #0000EE; text-decoration: underline;">anchor text</a>
