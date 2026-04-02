@@ -13,7 +13,9 @@ url = f"https://{SHOPIFY_STORE}/admin/api/2024-01/blogs.json"
 headers = {"X-Shopify-Access-Token": SHOPIFY_TOKEN}
 
 response = requests.get(url, headers=headers)
-blogs = response.json()["blogs"]
+print("Status:", response.status_code)
+print("Response:", response.json())
+blogs = response.json().get("blogs", [])
 
 for blog in blogs:
     print(f"ID: {blog['id']}  |  Title: {blog['title']}  |  Handle: {blog['handle']}")

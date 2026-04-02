@@ -17,11 +17,9 @@ from googleapiclient.discovery import build
 # ── Config ─────────────────────────────────────────────────────────────────
 
 GSC_SITE_URL        = "https://boringstudios.com.au"
-GSC_KEY_FILE        = "gsc-service-account.json"   # path to your downloaded JSON key
-SHOPIFY_STORE       = "boringstudios.myshopify.com"
-SHOPIFY_TOKEN       = os.environ["SHOPIFY_TOKEN"]   # set in GitHub Actions secrets
+GSC_KEY_FILE        = "gsc-service-account.json"
 ANTHROPIC_API_KEY   = os.environ["ANTHROPIC_API_KEY"]
-SHOPIFY_BLOG_ID     = "86091120946"                 # notes-from-the-studio blog ID
+MAKE_WEBHOOK_URL    = "https://hook.us2.make.com/fovbp51alv5blwlrfktd3qvsbk8m3eim"
 SITE_URL            = "https://boringstudios.com.au"
 SHOP_URL            = "https://boringstudios.com.au/collections/all"
 
@@ -247,50 +245,26 @@ The post must pass this checklist before you return it:
     return post_data
 
 
-# ── Step 4: Publish to Shopify ─────────────────────────────────────────────
+# ── Step 4: Send to Make webhook ───────────────────────────────────────────
 
-def publish_to_shopify(post_data, keyword_data):
-    """Publish the post to the Boring Studios Shopify blog."""
-
-    url = f"https://{SHOPIFY_STORE}/admin/api/2024-01/blogs/{SHOPIFY_BLOG_ID}/articles.json"
-
-    headers = {
-        "X-Shopify-Access-Token": SHOPIFY_TOKEN,
-        "Content-Type": "application/json"
-    }
+def publish_via_make(post_data, keyword_data):
+    """Send post data to Make webhook which publishes to Shopify."""
 
     payload = {
-        "article": {
-            "title":          post_data["title"],
-            "body_html":      post_data["body_html"],
-            "summary_html":   post_data["meta_description"],
-            "tags":           ", ".join(post_data.get("tags", [])),
-            "published":      True,
-            "metafields": [
-                {
-                    "key":       "title_tag",
-                    "value":     post_data["meta_title"],
-                    "type":      "single_line_text_field",
-                    "namespace": "global"
-                },
-                {
-                    "key":       "description_tag",
-                    "value":     post_data["meta_description"],
-                    "type":      "single_line_text_field",
-                    "namespace": "global"
-                }
-            ]
-        }
+        "title":            post_data["title"],
+        "body_html":        post_data["body_html"],
+        "meta_title":       post_data["meta_title"],
+        "meta_description": post_data["meta_description"],
+        "tags":             ", ".join(post_data.get("tags", [])),
+        "keyword":          keyword_data["keyword"],
+        "published":        True
     }
 
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.post(MAKE_WEBHOOK_URL, json=payload)
     response.raise_for_status()
 
-    article = response.json()["article"]
-    article_url = f"{SITE_URL}/blogs/notes-from-the-studio/{article['handle']}"
-
-    print(f"\n Published: {article_url}")
-    return article
+    print(f"\n Sent to Make webhook successfully")
+    return payload
 
 
 # ── Step 5: Log the run ────────────────────────────────────────────────────
@@ -303,9 +277,7 @@ def log_run(keyword_data, post_data, article):
         "keyword":     keyword_data["keyword"],
         "impressions": keyword_data["impressions"],
         "position":    keyword_data["position"],
-        "title":       post_data["title"],
-        "url":         f"{SITE_URL}/blogs/notes-from-the-studio/{article['handle']}",
-        "article_id":  article["id"]
+        "title":       post_data["title"]
     }
 
     log_file = "publish_log.json"
@@ -339,8 +311,8 @@ def main():
     print("\n[3/5] Writing post with Claude...")
     post_data = write_post(keyword_data)
 
-    print("\n[4/5] Publishing to Shopify...")
-    article = publish_to_shopify(post_data, keyword_data)
+    print("\n[4/5] Sending to Make...")
+    article = publish_via_make(post_data, keyword_data)
 
     print("\n[5/5] Logging run...")
     log_run(keyword_data, post_data, article)
