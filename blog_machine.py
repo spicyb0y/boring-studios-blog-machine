@@ -170,9 +170,36 @@ Return a JSON object with these exact keys:
   "tags": ["tag1", "tag2", "tag3"],
   "summary": "One sentence summary of the post",
   "cover_title": "Short punchy headline for cover image. Max 5 words. No article words like 'the', 'a', 'an' unless essential. Title case.",
-  "cover_subtitle": "One short punchy line for cover image. Max 8 words. A hook or teaser. Sentence case."
+  "cover_subtitle": "One short punchy line for cover image. Max 8 words. A hook or teaser. Sentence case.",
+  "faqs": [
+    {"question": "A real question someone would type into Google", "answer": "Direct 2-3 sentence answer."},
+    {"question": "Another common question about this topic", "answer": "Direct 2-3 sentence answer."},
+    {"question": "A third question", "answer": "Direct 2-3 sentence answer."}
+  ]
 }
 """
+
+# ── FAQ schema ──────────────────────────────────────────────────────────────
+
+def build_faq_schema(faqs):
+    """Build a JSON-LD FAQPage schema block and return as an HTML script tag."""
+    schema = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": faq["question"],
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": faq["answer"]
+                }
+            }
+            for faq in faqs
+        ]
+    }
+    return f'<script type="application/ld+json">{json.dumps(schema)}</script>'
+
 
 # ── Cover image helpers ─────────────────────────────────────────────────────
 
@@ -448,6 +475,10 @@ The post must pass this checklist before you return it:
         post_data["meta_title"] = post_data["meta_title"][:57] + "..."
     if len(post_data["meta_description"]) > 120:
         post_data["meta_description"] = post_data["meta_description"][:117] + "..."
+
+    # Inject FAQ schema into body
+    if post_data.get("faqs"):
+        post_data["body_html"] += build_faq_schema(post_data["faqs"])
 
     print(f"\n Post written: '{post_data['title']}'")
     print(f"   Meta title ({len(post_data['meta_title'])} chars): {post_data['meta_title']}")
