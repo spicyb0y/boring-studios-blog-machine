@@ -6,20 +6,25 @@ and publishes it to the Shopify blog.
 """
 
 import os
+import io
+import re
+import base64
 import json
 import random
 import datetime
 import requests
+from PIL import Image, ImageDraw, ImageFont
 from anthropic import Anthropic
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 # ── Config ─────────────────────────────────────────────────────────────────
 
-GSC_SITE_URL        = "https://boringstudios.com.au"
+GSC_SITE_URL        = "sc-domain:boringstudios.com.au"
 GSC_KEY_FILE        = "gsc-service-account.json"
 ANTHROPIC_API_KEY   = os.environ["ANTHROPIC_API_KEY"]
 MAKE_WEBHOOK_URL    = "https://hook.us2.make.com/fovbp51alv5blwlrfktd3qvsbk8m3eim"
+IMGBB_API_KEY       = os.environ.get("IMGBB_API_KEY", "")
 SITE_URL            = "https://boringstudios.com.au"
 SHOP_URL            = "https://boringstudios.com.au/collections/all"
 
@@ -100,9 +105,16 @@ SEO:
 - Meta description: 1-2 sentences, includes keyword, under 120 characters, reads like a human wrote it
 
 PRODUCT LINKS
-When linking to Boring Studios products, frame as a helpful next step, never a hard sell.
-Example: "If you want a head start, we built [product] for exactly this."
+Link to 1-2 Boring Studios products per post. Be direct. Frame it as the obvious next step.
+Examples:
+- "We built [product] for exactly this. Go grab it here."
+- "If you want to skip the setup, [product] has it all ready to go."
+- "[Product] is what I'd start with. It's all here."
 Only link 1-2 products per post. Choose from: https://boringstudios.com.au/collections/all
+
+LINK STYLING
+All hyperlinks must use inline styles: <a href="URL" style="color: #0000EE; text-decoration: underline;">anchor text</a>
+This applies to every link in the post including product links.
 
 OUTPUT FORMAT
 Return a JSON object with these exact keys:
@@ -110,11 +122,142 @@ Return a JSON object with these exact keys:
   "title": "Post title (H1, sentence case)",
   "meta_title": "Meta title (under 60 chars, sentence case)",
   "meta_description": "Meta description (under 120 chars, includes keyword)",
-  "body_html": "Full post body as HTML with proper H2/H3 tags, paragraphs, lists. No H1 in body.",
+  "body_html": "Full post body as HTML with proper H2/H3 tags, paragraphs, lists. No H1 in body. All links must use style='color: #0000EE; text-decoration: underline;'",
   "tags": ["tag1", "tag2", "tag3"],
-  "summary": "One sentence summary of the post"
+  "summary": "One sentence summary of the post",
+  "cover_title": "Short punchy headline for cover image. Max 5 words. No article words like 'the', 'a', 'an' unless essential. Title case.",
+  "cover_subtitle": "One short punchy line for cover image. Max 8 words. A hook or teaser. Sentence case."
 }
 """
+
+# ── Cover image helpers ─────────────────────────────────────────────────────
+
+def _load_font(bold=False, size=40):
+    """Load Helvetica Neue from system, with fallbacks for Linux CI."""
+    # macOS: HelveticaNeue.ttc — index 1 = Bold, index 0 = Regular
+    ttc = "/System/Library/Fonts/HelveticaNeue.ttc"
+    if os.path.exists(ttc):
+        return ImageFont.truetype(ttc, size, index=1 if bold else 0)
+    # Linux (GitHub Actions with fonts-liberation)
+    linux_path = (
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if bold
+        else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+    )
+    if os.path.exists(linux_path):
+        return ImageFont.truetype(linux_path, size)
+    return ImageFont.load_default()
+
+
+def _pt_to_px(pt, dpi=150):
+    """Convert Illustrator points to pixels at given DPI."""
+    return round(pt * dpi / 72)
+
+
+def _draw_tracked(draw, pos, text, font, fill, tracking=-30, dpi=150):
+    """Draw text with Illustrator-style tracking (1/1000 em units)."""
+    font_pt     = font.size * 72 / dpi          # px back to pt
+    spacing_px  = (tracking / 1000) * font_pt * (dpi / 72)
+    x, y = pos
+    for char in text:
+        draw.text((x, y), char, font=font, fill=fill)
+        x += draw.textbbox((0, 0), char, font=font)[2] + spacing_px
+    return x
+
+
+def _measure_tracked(draw, text, font, tracking=-30, dpi=150):
+    """Measure width of tracked text."""
+    font_pt    = font.size * 72 / dpi
+    spacing_px = (tracking / 1000) * font_pt * (dpi / 72)
+    w = 0
+    for char in text:
+        w += draw.textbbox((0, 0), char, font=font)[2] + spacing_px
+    return w
+
+
+def _wrap_tracked(draw, text, font, max_width, tracking=-30, dpi=150):
+    """Word-wrap text accounting for tracking."""
+    words, lines, current = text.split(), [], ""
+    for word in words:
+        test = f"{current} {word}".strip()
+        if _measure_tracked(draw, test, font, tracking, dpi) > max_width and current:
+            lines.append(current)
+            current = word
+        else:
+            current = test
+    if current:
+        lines.append(current)
+    return lines
+
+
+def generate_cover_image(title, tags, body_html, cover_title="", cover_subtitle=""):
+    """Generate a cover image matching Boring Studios blog template. Returns PNG bytes."""
+    DPI   = 150
+    W, H  = 2501, 1667
+    BG    = (7, 7, 7)
+    WHITE = (255, 255, 255)
+    pad   = 180   # generous margin (~86pt at 150dpi)
+
+    img  = Image.new("RGB", (W, H), color=BG)
+    draw = ImageDraw.Draw(img)
+
+    # Read time + category
+    plain     = re.sub(r"<[^>]+>", "", body_html)
+    read_time = max(1, round(len(plain.split()) / 200))
+    category  = tags[0].title() if tags else "Notes"
+
+    # Use cover-specific copy if available, fall back to full title/summary
+    headline = cover_title if cover_title else title
+    subtitle = cover_subtitle if cover_subtitle else ""
+
+    # Font sizes (Illustrator pt → pixels at 150 DPI)
+    title_font = _load_font(bold=True,  size=_pt_to_px(90, DPI))   # 188px bold
+    sub_font   = _load_font(bold=False, size=_pt_to_px(60, DPI))   # 125px regular
+    meta_font  = _load_font(bold=False, size=_pt_to_px(30, DPI))   # 63px regular
+
+    max_w  = W - pad * 2
+    line_h = draw.textbbox((0, 0), "Ag", font=title_font)[3]
+    sub_lh = draw.textbbox((0, 0), "Ag", font=sub_font)[3]
+
+    # Headline — bold, -30 tracking
+    y = pad
+    for line in _wrap_tracked(draw, headline, title_font, max_w, tracking=-30, dpi=DPI):
+        _draw_tracked(draw, (pad, y), line, title_font, WHITE, tracking=-30, dpi=DPI)
+        y += line_h + _pt_to_px(8, DPI)   # ~110% line height
+
+    # Divider — 2mm
+    y += _pt_to_px(22, DPI)
+    divider_w = round(2 * DPI / 25.4)
+    draw.line([(pad, y), (W - pad, y)], fill=WHITE, width=divider_w)
+    y += divider_w + _pt_to_px(28, DPI)
+
+    # Subtitle — regular, no tracking
+    if subtitle:
+        for line in _wrap_tracked(draw, subtitle, sub_font, max_w, tracking=0, dpi=DPI):
+            _draw_tracked(draw, (pad, y), line, sub_font, WHITE, tracking=0, dpi=DPI)
+            y += sub_lh + _pt_to_px(8, DPI)
+
+    # Meta — bottom left, -30 tracking
+    meta_text = f"{category} - {read_time} minute read"
+    meta_y    = H - pad - _pt_to_px(30, DPI)
+    _draw_tracked(draw, (pad, meta_y), meta_text, meta_font, WHITE, tracking=-30, dpi=DPI)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", dpi=(DPI, DPI))
+    return buf.getvalue()
+
+
+def upload_cover_image(image_bytes):
+    """Upload image to imgbb and return public URL. Returns None if no API key."""
+    if not IMGBB_API_KEY:
+        print("   No IMGBB_API_KEY set — skipping cover image")
+        return None
+    b64      = base64.b64encode(image_bytes).decode("utf-8")
+    response = requests.post("https://api.imgbb.com/1/upload", data={"key": IMGBB_API_KEY, "image": b64})
+    response.raise_for_status()
+    url = response.json()["data"]["url"]
+    print(f"   Cover image uploaded: {url}")
+    return url
+
 
 # ── Step 1: Pull keyword opportunities from GSC ─────────────────────────────
 
@@ -238,7 +381,23 @@ The post must pass this checklist before you return it:
     elif "```" in content:
         content = content.split("```")[1].split("```")[0].strip()
 
-    post_data = json.loads(content)
+    # Attempt parse with one retry on failure
+    try:
+        post_data = json.loads(content)
+    except json.JSONDecodeError:
+        print("   JSON parse failed, retrying...")
+        retry = client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=8192,
+            system=TOV_SYSTEM_PROMPT,
+            messages=[
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": content},
+                {"role": "user", "content": "The JSON you returned was malformed. Return only the corrected valid JSON object, no markdown fences."}
+            ]
+        )
+        content = retry.content[0].text.strip()
+        post_data = json.loads(content)
     print(f"\n Post written: '{post_data['title']}'")
     print(f"   Meta title ({len(post_data['meta_title'])} chars): {post_data['meta_title']}")
     print(f"   Meta desc ({len(post_data['meta_description'])} chars): {post_data['meta_description']}")
@@ -247,7 +406,7 @@ The post must pass this checklist before you return it:
 
 # ── Step 4: Send to Make webhook ───────────────────────────────────────────
 
-def publish_via_make(post_data, keyword_data):
+def publish_via_make(post_data, keyword_data, cover_image_url=None):
     """Send post data to Make webhook which publishes to Shopify."""
 
     payload = {
@@ -259,6 +418,8 @@ def publish_via_make(post_data, keyword_data):
         "keyword":          keyword_data["keyword"],
         "published":        True
     }
+    if cover_image_url:
+        payload["cover_image_url"] = cover_image_url
 
     response = requests.post(MAKE_WEBHOOK_URL, json=payload)
     response.raise_for_status()
@@ -301,20 +462,24 @@ def main():
     print("Boring Studios Blog Machine")
     print("=" * 40)
 
-    print("\n[1/5] Pulling keyword opportunities from GSC...")
+    print("\n[1/6] Pulling keyword opportunities from GSC...")
     opportunities = get_keyword_opportunities()
     print(f"   Found {len(opportunities)} opportunities")
 
-    print("\n[2/5] Selecting keyword...")
+    print("\n[2/6] Selecting keyword...")
     keyword_data = select_keyword(opportunities)
 
-    print("\n[3/5] Writing post with Claude...")
+    print("\n[3/6] Writing post with Claude...")
     post_data = write_post(keyword_data)
 
-    print("\n[4/5] Sending to Make...")
-    article = publish_via_make(post_data, keyword_data)
+    print("\n[4/6] Generating cover image...")
+    image_bytes = generate_cover_image(post_data["title"], post_data.get("tags", []), post_data["body_html"], post_data.get("cover_title", ""), post_data.get("cover_subtitle", ""))
+    cover_image_url = upload_cover_image(image_bytes)
 
-    print("\n[5/5] Logging run...")
+    print("\n[5/6] Sending to Make...")
+    article = publish_via_make(post_data, keyword_data, cover_image_url)
+
+    print("\n[6/6] Logging run...")
     log_run(keyword_data, post_data, article)
 
     print("\n Done. Post is live.")

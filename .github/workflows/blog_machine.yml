@@ -21,7 +21,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          sudo apt-get install -y fonts-liberation
+          pip install -r requirements.txt
 
       - name: Write GSC service account key
         run: echo '${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}' > gsc-service-account.json
