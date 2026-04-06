@@ -30,8 +30,9 @@ jobs:
 
       - name: Run blog machine
         env:
-          SHOPIFY_TOKEN:    ${{ secrets.SHOPIFY_TOKEN }}
+          SHOPIFY_TOKEN:     ${{ secrets.SHOPIFY_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IMGBB_API_KEY:     ${{ secrets.IMGBB_API_KEY }}
         run: python blog_machine.py
 
       - name: Commit publish log
