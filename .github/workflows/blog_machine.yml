@@ -39,7 +39,7 @@ jobs:
         run: |
           git config user.name "Blog Machine"
           git config user.email "actions@github.com"
+          git pull --rebase origin main
           git add publish_log.json
           git diff --quiet && git diff --staged --quiet || git commit -m "Log: post published $(date +'%Y-%m-%d')"
-          git pull --rebase origin main
           git push
